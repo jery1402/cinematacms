@@ -5,6 +5,10 @@ from allauth.mfa.totp.forms import ActivateTOTPForm
 
 from allauth.account import app_settings
 from .models import Channel, User
+from files.lists import video_countries
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CustomAuthenticateForm(AuthenticateForm):
     """This form is fetched for standard authentication,
@@ -49,14 +53,35 @@ class MultipleSelect(forms.CheckboxSelectMultiple):
 
 class SignupForm(forms.Form):
     name = forms.CharField(max_length=100, label="Name")
+    location_country = forms.ChoiceField(
+        required=True,
+        choices=[('', '-- Select your country --')] + list(video_countries),
+        label='Country/Region'
+    )
 
     def signup(self, request, user):
         user.name = self.cleaned_data["name"]
+        user.location_country = self.cleaned_data.get("location_country")
         user.save()
+        
+        # Handle newsletter subscription
         if self.data.get("subscribe"):
-            from files.tasks import subscribe_user
-
-            subscribe_user.delay(user.email, user.name)
+            try:
+                from files.tasks import subscribe_user
+                
+                # Get country from form
+                country = self.cleaned_data.get("location_country")
+                
+                # Trigger async task to subscribe user
+                subscribe_user.delay(
+                    email=user.email,
+                    name=user.name,
+                    country=country
+                )
+                logger.info(f"Newsletter subscription task queued for {user.email}")
+            except Exception as e:
+                # Don't fail signup if newsletter subscription fails
+                logger.error(f"Failed to queue newsletter subscription for {user.email}: {str(e)}")
 
 
 class UserForm(forms.ModelForm):
