@@ -321,6 +321,8 @@ def encode_media(
         command = [
             settings.FFMPEG_COMMAND,
             "-y",
+            "-threads",
+            "1",
             "-ss",
             "3",
             "-i",
