@@ -12,7 +12,6 @@ const meta = {
 			{ key: 'community_impact', value: 'saves', label: 'Saves & Playlists' },
 		],
 		onDismiss: () => {},
-		onClearAll: () => {},
 	},
 	render: (args) => (
 		<div className="max-w-[680px] bg-bg-page p-6">
@@ -28,6 +27,6 @@ export const Default = {
 		const canvas = within(canvasElement);
 
 		await expect(canvas.getByText('Philippines')).toBeVisible();
-		await expect(canvas.getByRole('button', { name: 'Clear all' })).toBeVisible();
+		await expect(canvas.getByText('Indonesia')).toBeVisible();
 	},
 };

@@ -25,16 +25,16 @@ function MobileFilterSheetContent({ filters, sort, filterOptionSections, onReset
 	function handleReset() {
 		setLocalFilters(createEmptyFilters());
 		setLocalSort(DEFAULT_SORT);
-		onReset();
+		if (onReset) onReset();
 	}
 
 	function handleSave() {
-		onSave(localFilters, localSort);
-		onClose();
+		if (onSave) onSave(localFilters, localSort);
+		if (onClose) onClose();
 	}
 
 	function handleCancel() {
-		onClose();
+		if (onClose) onClose();
 	}
 
 	const sections = buildSections(localFilters, localSort, filterOptionSections);
@@ -102,7 +102,7 @@ export function MobileFilterSheet({ filters, sort, filterOptionSections, onReset
 
 MobileFilterSheet.propTypes = {
 	filters: PropTypes.object.isRequired,
-	sort: PropTypes.shape({ field: PropTypes.string, ordering: PropTypes.string }).isRequired,
+	sort: PropTypes.shape({ popularity: PropTypes.string, ordering: PropTypes.string }).isRequired,
 	filterOptionSections: PropTypes.object.isRequired,
 	onReset: PropTypes.func,
 	onSave: PropTypes.func,
