@@ -3,6 +3,15 @@ import { useSimilarProfiles } from '../hooks/useSimilarProfiles';
 import { getJoinedLabel } from '../utils/joinedDate';
 import { ProfileSectionHeader } from './ProfileSectionHeader';
 
+// Columns follow the section's width, not the viewport: from 768px an open
+// sidebar takes ~260px, which squeezed viewport-based tracks below the ~210px
+// a card's stats line needs. Three profiles never use four tracks, and four
+// never use three, so neither leaves a lone card on the last row.
+const GRID_COLUMNS = {
+	three: '@lg:ml-[57px] @lg:grid-cols-2 @3xl:grid-cols-3',
+	four: '@lg:ml-[57px] @lg:grid-cols-2 @min-[58rem]:ml-0 @min-[58rem]:grid-cols-4',
+};
+
 function normalizeProfiles(data) {
 	if (Array.isArray(data)) return data;
 	return Array.isArray(data?.results) ? data.results : [];
@@ -28,10 +37,9 @@ export function SimilarProfiles({ author }) {
 				as="h2"
 				id="similar-profiles-heading"
 			/>
-			{/* Columns follow the section's width, not the viewport: from 768px an
-			    open sidebar takes ~260px, which squeezed viewport-based tracks
-			    below the ~210px a card's stats line needs. */}
-			<div className="mt-4 grid grid-cols-1 gap-5 @lg:ml-[57px] @lg:grid-cols-2 @3xl:grid-cols-3 @min-[58rem]:ml-0 @min-[58rem]:grid-cols-4">
+			<div
+				className={`mt-4 grid grid-cols-1 gap-5 ${GRID_COLUMNS[!isLoading && profiles.length === 3 ? 'three' : 'four']}`}
+			>
 				{isLoading
 					? Array.from({ length: 4 }, (_, index) => (
 							<div

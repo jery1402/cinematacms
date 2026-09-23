@@ -142,7 +142,7 @@ describe('SimilarProfiles', () => {
 			expect(container).toBeEmptyDOMElement();
 		});
 
-		it('sizes its columns from the section width, up to four', () => {
+		it('sizes its columns from the section width, not the viewport', () => {
 			const { container } = renderProfiles([profile]);
 
 			// The sidebar takes width without changing the viewport, so viewport
@@ -151,8 +151,33 @@ describe('SimilarProfiles', () => {
 			expect(section.className).toContain('@container');
 
 			const grid = container.querySelector('.grid');
-			expect(grid.className).toContain('@min-[58rem]:grid-cols-4');
 			expect(grid.className).not.toMatch(/(^|\s)xl:grid-cols-4/);
+		});
+
+		// Four cards in three columns, or three cards in four, leave a lone card
+		// or an empty track on the last row.
+		it.each([
+			{ count: 1, widest: '@min-[58rem]:grid-cols-4', never: 'grid-cols-3' },
+			{ count: 2, widest: '@min-[58rem]:grid-cols-4', never: 'grid-cols-3' },
+			{ count: 3, widest: '@3xl:grid-cols-3', never: 'grid-cols-4' },
+			{ count: 4, widest: '@min-[58rem]:grid-cols-4', never: 'grid-cols-3' },
+		])('lays out $count profile(s) with $widest as the widest step', ({ count, widest, never }) => {
+			const { container } = renderProfiles(
+				Array.from({ length: count }, (_, index) => ({ ...profile, username: `member${index}` }))
+			);
+
+			const grid = container.querySelector('.grid');
+			expect(grid.className).toContain(widest);
+			expect(grid.className).not.toContain(never);
+		});
+
+		it('lays out the loading placeholders as four', () => {
+			useSimilarProfiles.mockReturnValue({ data: undefined, isLoading: true, isError: false });
+			const { container } = render(<SimilarProfiles author={{ username: 'jen', location_country: 'PH' }} />);
+
+			const grid = container.querySelector('.grid');
+			expect(grid.className).toContain('@min-[58rem]:grid-cols-4');
+			expect(grid.className).not.toContain('grid-cols-3');
 		});
 	});
 });
