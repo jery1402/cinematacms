@@ -18,14 +18,20 @@ export function SimilarProfiles({ author }) {
 	if (isError || (!isLoading && profiles.length === 0)) return null;
 
 	return (
-		<section aria-labelledby="similar-profiles-heading" className="rounded-lg border border-border-default p-4">
+		<section
+			aria-labelledby="similar-profiles-heading"
+			className="@container rounded-lg border border-border-default p-4"
+		>
 			<ProfileSectionHeader
 				icon="profileSimilarProfiles"
 				title="Similar Profiles"
 				as="h2"
 				id="similar-profiles-heading"
 			/>
-			<div className="mt-4 grid grid-cols-1 gap-5 sm:ml-[57px] sm:grid-cols-2 lg:grid-cols-3 xl:ml-0 xl:grid-cols-4">
+			{/* Columns follow the section's width, not the viewport: from 768px an
+			    open sidebar takes ~260px, which squeezed viewport-based tracks
+			    below the ~210px a card's stats line needs. */}
+			<div className="mt-4 grid grid-cols-1 gap-5 @lg:ml-[57px] @lg:grid-cols-2 @3xl:grid-cols-3 @min-[58rem]:ml-0 @min-[58rem]:grid-cols-4">
 				{isLoading
 					? Array.from({ length: 4 }, (_, index) => (
 							<div
@@ -73,7 +79,7 @@ export function SimilarProfiles({ author }) {
 										</div>
 									</div>
 									<UserRoleBadge isManager={profile.is_manager} isTrusted={profile.is_trusted} />
-									<div className="flex flex-col items-center gap-1">
+									<div className="flex w-full min-w-0 flex-col items-center gap-1">
 										{profile.location ? (
 											<Text
 												as="p"
@@ -88,7 +94,7 @@ export function SimilarProfiles({ author }) {
 											<Text
 												as="p"
 												variant="body-14"
-												className="m-0 inline-flex items-center gap-2 whitespace-nowrap text-text-secondary"
+												className="m-0 inline-flex items-center gap-2 text-text-secondary"
 											>
 												<Icon name="profileVideoCount" size="xs" decorative />
 												{mediaCount.toLocaleString()} {mediaCount === 1 ? 'video' : 'videos'}
@@ -97,7 +103,7 @@ export function SimilarProfiles({ author }) {
 												<Text
 													as="p"
 													variant="body-14"
-													className="m-0 inline-flex items-center gap-2 whitespace-nowrap text-text-secondary"
+													className="m-0 inline-flex items-center gap-2 text-text-secondary"
 												>
 													<Icon name="profileMemberSince" size="xs" decorative />
 													{joinedLabel}
