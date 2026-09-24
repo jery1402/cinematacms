@@ -2487,7 +2487,7 @@ class TinyMCEMedia(models.Model):
 
 
 @receiver(post_save, sender=Media)
-def media_save(sender, instance, created, **kwargs):
+def media_save(sender, instance, created, update_fields=None, **kwargs):
     # media_file path is not set correctly until mode is saved
     # post_save signal will take care of calling a few functions
     # once model is saved
@@ -2537,7 +2537,15 @@ def media_save(sender, instance, created, **kwargs):
             ml = MediaLanguage.objects.filter(title=language_title).first()
             if ml:
                 ml.update_language_media()
-    instance.update_search_vector()
+    # The search vector is written by its own UPDATE, outside update_fields. A
+    # scoped save leaves the other columns as stored, and those may be newer than
+    # this instance, so index the stored row rather than the instance's stale
+    # copy of it (#841). It is still rebuilt on every save: tags are added after
+    # the edit form saves and only reach the index on the next one.
+    indexed = instance
+    if update_fields is not None:
+        indexed = Media.objects.select_related("user").filter(pk=instance.pk).first() or instance
+    indexed.update_search_vector()
     instance.transcribe_function()
 
 
@@ -3052,7 +3060,7 @@ def playlist_media_delete(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=Media)
-def invalidate_playlist_composites_on_state_change(sender, instance, created, **kwargs):
+def invalidate_playlist_composites_on_state_change(sender, instance, created, update_fields=None, **kwargs):
     """Invalidate composite thumbnails of playlists that contain this media
     when its visibility state changes.
 
@@ -3063,6 +3071,10 @@ def invalidate_playlist_composites_on_state_change(sender, instance, created, **
     the updated visibility.
     """
     if created:
+        return
+    # Same rule as the hooks in Media.save(): a scoped save that does not write
+    # state leaves the stored state unchanged, whatever the instance holds (#841).
+    if update_fields is not None and "state" not in update_fields:
         return
     original_state = getattr(instance, "_Media__original_state", None)
     if original_state is None or original_state == instance.state:

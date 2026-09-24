@@ -810,3 +810,81 @@ class StaleInstanceFileFieldSaveTest(TestCase):
         self.assertTrue(notify_users.called, "published notification did not fire for a persisted state")
         self.assertTrue(invalidate.called, "permission cache was not invalidated for a persisted state")
         self.assertEqual(Media.objects.get(pk=media.pk).state, "public")
+
+    def _findable(self, media, word):
+        from django.contrib.postgres.search import SearchQuery
+
+        return Media.objects.filter(pk=media.pk, search=SearchQuery(word, config="simple")).exists()
+
+    def test_scoped_save_indexes_search_from_the_stored_row(self):
+        """A scoped save must not index the stale instance's text.
+
+        The media_save receiver rebuilds the search vector with its own UPDATE,
+        outside update_fields. Built from a stale instance, it made the row
+        findable by a title it no longer had while the title column itself was
+        correct.
+        """
+        from django.core.files.base import ContentFile
+
+        writes = [
+            ("file write", lambda stale: stale.sprites.save("sprites.jpg", ContentFile(b"sprite"))),
+            ("explicit update_fields", lambda stale: stale.save(update_fields=["encoding_status"])),
+        ]
+        for label, write in writes:
+            with self.subTest(write=label):
+                media = create_test_media(self.user, title="aardvark")
+                stale = Media.objects.get(pk=media.pk)
+                fresh = Media.objects.get(pk=media.pk)
+                fresh.title = "buffalo"
+                fresh.save()
+
+                write(stale)
+
+                self.assertTrue(self._findable(media, "buffalo"), "row not findable by its stored title")
+                self.assertFalse(self._findable(media, "aardvark"), "row still findable by a title it no longer has")
+
+    def test_scoped_save_still_indexes_tags_added_since_the_last_save(self):
+        """Tags are added after the edit form's save and reach the index on the next save.
+
+        That next save is often a scoped pipeline write, so a scoped save must
+        keep rebuilding the vector rather than skip it.
+        """
+        from files.models import Tag
+
+        media = create_test_media(self.user, title="original")
+        media.tags.add(Tag.objects.create(title="zeppelin", user=self.user))
+        self.assertFalse(self._findable(media, "zeppelin"))
+
+        Media.objects.get(pk=media.pk).save(update_fields=["encoding_status"])
+
+        self.assertTrue(self._findable(media, "zeppelin"))
+
+    def test_playlist_composites_follow_the_state_a_save_persists(self):
+        """Playlist composites are rebuilt only when the stored state changes."""
+        from django.core.files.base import ContentFile
+
+        from files.models import Playlist, PlaylistMedia
+
+        cases = [
+            ("file write, state unwritten", lambda m: m.sprites.save("sprites.jpg", ContentFile(b"s")), False),
+            ("scoped save of state", lambda m: m.save(update_fields=["state"]), True),
+            ("full save", lambda m: m.save(), True),
+        ]
+        for label, write, expected in cases:
+            with self.subTest(write=label):
+                media = create_test_media(self.user, title="original", state="private")
+                playlist = Playlist.objects.create(user=self.user, title="playlist")
+                PlaylistMedia.objects.create(playlist=playlist, media=media)
+                fresh = Media.objects.get(pk=media.pk)
+                fresh.state = "public"
+
+                with (
+                    patch("files.models.delete_composite_thumbnail") as delete_composite,
+                    patch("files.models.invalidate_playlist_cache") as invalidate_playlist,
+                ):
+                    write(fresh)
+
+                stored_state = Media.objects.get(pk=media.pk).state
+                self.assertEqual(stored_state, "public" if expected else "private")
+                self.assertEqual(delete_composite.called, expected)
+                self.assertEqual(invalidate_playlist.called, expected)
