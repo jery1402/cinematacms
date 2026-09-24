@@ -3175,9 +3175,12 @@ class FeaturedVideo(models.Model):
 
 
 @receiver(pre_save, sender=Media)
-def track_featured_change(sender, instance, **kwargs):
+def track_featured_change(sender, instance, update_fields=None, **kwargs):
     """Track when featured field is about to change."""
-    if instance.pk:
+    # A save that does not write featured cannot change it. Comparing anyway
+    # lets a stale instance still holding featured=True re-feature a media that
+    # was unfeatured since it was loaded (#841).
+    if instance.pk and (update_fields is None or "featured" in update_fields):
         try:
             old = Media.objects.get(pk=instance.pk)
             instance._featured_changed = old.featured != instance.featured

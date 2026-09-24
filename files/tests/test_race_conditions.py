@@ -895,3 +895,44 @@ class StaleInstanceFileFieldSaveTest(TestCase):
                 self.assertEqual(delete_composite.called, expected)
                 self.assertEqual(invalidate_playlist.called, expected)
 
+    def test_featured_follows_the_featured_a_save_persists(self):
+        """The featured receivers act only when a save writes featured.
+
+        track_featured_change compares the stored row with the instance. A
+        stale instance still holding featured=True made a scoped file write look
+        like "just featured", so it re-featured a media an admin had unfeatured
+        in the meantime.
+        """
+        from django.core.files.base import ContentFile
+
+        from files.models import FeaturedVideo
+
+        def stale_file_write_after_unfeature(media):
+            stale = Media.objects.get(pk=media.pk)
+            unfeatured = Media.objects.get(pk=media.pk)
+            unfeatured.featured = False
+            unfeatured.save(update_fields=["featured"])
+            stale.sprites.save("sprites.jpg", ContentFile(b"sprite"))
+
+        def feature_with(**save_kwargs):
+            def write(media):
+                fresh = Media.objects.get(pk=media.pk)
+                fresh.featured = True
+                fresh.save(**save_kwargs)
+
+            return write
+
+        cases = [
+            ("stale file write after unfeature", True, stale_file_write_after_unfeature, False),
+            ("feature via update_fields", False, feature_with(update_fields=["featured"]), True),
+            ("feature via full save", False, feature_with(), True),
+        ]
+        for label, initially_featured, write, expected in cases:
+            with self.subTest(write=label):
+                media = create_test_media(self.user, title="original", featured=initially_featured)
+
+                write(media)
+
+                stored = Media.objects.get(pk=media.pk)
+                self.assertEqual(stored.featured, expected)
+                self.assertEqual(FeaturedVideo.objects.filter(media=media).exists(), expected)
