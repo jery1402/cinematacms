@@ -497,6 +497,7 @@ class StaleInstanceFileFieldSaveTest(TestCase):
         self.assertEqual(self._stored_title(stale), "changed")
         stored = Media.objects.get(pk=stale.pk)
         self.assertTrue(stored.sprites.name)
+        self.assertTrue(stored.sprites.storage.exists(stored.sprites.name))
         self.assertEqual(stored.sprite_num_secs, result["sprite_num_secs"])
 
     def test_set_thumbnail_does_not_revert_unrelated_column(self):
@@ -508,7 +509,9 @@ class StaleInstanceFileFieldSaveTest(TestCase):
         self.assertEqual(self._stored_title(stale), "changed")
         stored = Media.objects.get(pk=stale.pk)
         self.assertTrue(stored.thumbnail.name)
+        self.assertTrue(stored.thumbnail.storage.exists(stored.thumbnail.name))
         self.assertTrue(stored.poster.name)
+        self.assertTrue(stored.poster.storage.exists(stored.poster.name))
 
     def test_produce_thumbnails_from_video_does_not_revert_unrelated_column(self):
         """files/models.py produce_thumbnails_from_video() -- thumbnail + poster."""
@@ -527,7 +530,9 @@ class StaleInstanceFileFieldSaveTest(TestCase):
         self.assertEqual(self._stored_title(stale), "changed")
         stored = Media.objects.get(pk=stale.pk)
         self.assertTrue(stored.thumbnail.name)
+        self.assertTrue(stored.thumbnail.storage.exists(stored.thumbnail.name))
         self.assertTrue(stored.poster.name)
+        self.assertTrue(stored.poster.storage.exists(stored.poster.name))
 
     def test_uploaded_thumbnail_save_does_not_revert_unrelated_column(self):
         """files/models.py Media.save() -- the uploaded_poster -> uploaded_thumbnail write."""
@@ -548,6 +553,7 @@ class StaleInstanceFileFieldSaveTest(TestCase):
         self.assertEqual(self._stored_title(stale), "changed")
         stored = Media.objects.get(pk=media.pk)
         self.assertTrue(stored.uploaded_thumbnail.name)
+        self.assertTrue(stored.uploaded_thumbnail.storage.exists(stored.uploaded_thumbnail.name))
 
     def test_every_filefield_on_media_is_safe_under_the_default_save(self):
         """FieldFile.save()'s default save=True must not revert a stale row.
@@ -888,3 +894,4 @@ class StaleInstanceFileFieldSaveTest(TestCase):
                 self.assertEqual(stored_state, "public" if expected else "private")
                 self.assertEqual(delete_composite.called, expected)
                 self.assertEqual(invalidate_playlist.called, expected)
+
