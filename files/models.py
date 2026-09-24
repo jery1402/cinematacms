@@ -649,6 +649,10 @@ class Media(models.Model):
     # something every caller has to remember.
     _file_field_save_in_progress = None
 
+    # The file columns media_version versions URLs for, through edit_date. hls_file
+    # is a CharField with its own version (hls_version), so it is not listed.
+    FILE_FIELDS = frozenset({"media_file", "thumbnail", "poster", "uploaded_thumbnail", "uploaded_poster", "sprites"})
+
     def save(self, *args, update_fields=None, **kwargs):
         # A FieldFile.save(save=True) reaches here with no update_fields. Scope it
         # to the field that triggered it instead of replaying the whole instance.
@@ -771,6 +775,12 @@ class Media(models.Model):
         # test below and Model.save() itself consume it, so materialize it once
         # and hand the same collection on rather than an exhausted generator.
         if update_fields is not None:
+            # A file write was a full save before #841, which advanced the auto_now
+            # edit_date. File URLs are versioned off it (media_version), and feeds
+            # and "last updated" sorting read it, so a scoped file write names it:
+            # Django only sets auto_now on a field that update_fields includes.
+            if self.FILE_FIELDS & set(update_fields):
+                update_fields = frozenset(update_fields) | {"edit_date"}
             kwargs["update_fields"] = update_fields
 
         # ensure_encryption_key() can commit a key between an unlocked re-read and
@@ -851,8 +861,10 @@ class Media(models.Model):
                 # super().save() above has already persisted the rest of the row;
                 # a second full-row write here would replay the whole in-memory
                 # snapshot, including anything another worker changed meanwhile.
+                # edit_date for the same reason as the scoped saves above; this
+                # write bypasses Media.save(), so it names the column itself.
                 self.uploaded_thumbnail.save(content=myfile, name=thumbnail_name, save=False)
-                super(Media, self).save(update_fields=["uploaded_thumbnail"])
+                super(Media, self).save(update_fields=["uploaded_thumbnail", "edit_date"])
 
     def ensure_encryption_key(self):
         """Generate an AES-128 key if one doesn't exist. Returns hex string.
